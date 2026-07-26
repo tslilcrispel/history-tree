@@ -6,7 +6,7 @@ import type {
   LayoutOptions,
   MiniLayoutOptions,
 } from "./types";
-import { ancestorsOf, computeLayout, DEFAULT_MINI } from "./layout";
+import { ancestorsOf, computeLayout, DEFAULT_LAYOUT, DEFAULT_MINI } from "./layout";
 import { DEFAULT_ACCENT, resolveTheme } from "./theme";
 
 /** Signature shared by the step event handlers. */
@@ -130,6 +130,22 @@ export function HistoryTree<T = unknown>(props: HistoryTreeProps<T>) {
     );
   }
 
+  // When the root is stretched wider/taller than its content (e.g. the caller
+  // passes `minWidth/minHeight: 100%`), position the whole graph along the axis
+  // it grows on: horizontal layouts hug the side the direction points *from*
+  // (RL → right, LR → left) and sit at the top; vertical layouts hug the top or
+  // bottom (BT → bottom) and centre horizontally. The root is a flex container
+  // (main axis = horizontal); the fixed-size content block below is placed
+  // accordingly instead of always pinning to the top-left.
+  const direction = layoutProp?.direction ?? DEFAULT_LAYOUT.direction;
+  const horizontal = direction === "LR" || direction === "RL";
+  const justifyContent = horizontal
+    ? direction === "RL"
+      ? "flex-end"
+      : "flex-start"
+    : "center";
+  const alignItems = direction === "BT" ? "flex-end" : "flex-start";
+
   return (
     <div
       className={className}
@@ -137,12 +153,23 @@ export function HistoryTree<T = unknown>(props: HistoryTreeProps<T>) {
       aria-label={ariaLabel}
       style={{
         ...rootBase,
+        display: "flex",
+        justifyContent,
+        alignItems,
         width: layout.width,
         height: layout.height,
         fontFamily: theme.fontFamily,
         ...style,
       }}
     >
+      <div
+        style={{
+          position: "relative",
+          flex: "0 0 auto",
+          width: layout.width,
+          height: layout.height,
+        }}
+      >
       <svg
         width={layout.width}
         height={layout.height}
@@ -263,6 +290,7 @@ export function HistoryTree<T = unknown>(props: HistoryTreeProps<T>) {
           </div>
         );
       })}
+      </div>
     </div>
   );
 }
