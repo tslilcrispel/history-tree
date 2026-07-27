@@ -1,5 +1,5 @@
 {
-  "name": "a",
+  "name": "history-tree",
   "version": "0.1.0",
   "description": "A branching step-history tree for investigation / graph tools. React + TypeScript, zero runtime dependencies.",
   "type": "module",
