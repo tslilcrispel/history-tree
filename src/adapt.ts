@@ -13,6 +13,8 @@ export interface RawStep {
   inputLabel?: string;
   tag?: ReactNode;
   accent?: string;
+  /** Render this step faded and non-interactive. */
+  disabled?: boolean;
   /** Kept for host use (e.g. a side panel); the tree no longer renders these. */
   addedCount?: number;
   groupCount?: number;
@@ -34,6 +36,7 @@ export function fromStepMap<T extends RawStep = RawStep>(
     subtitle: s.inputLabel,
     tag: s.tag,
     accent: s.accent,
+    disabled: s.disabled,
     data: s,
   }));
 }

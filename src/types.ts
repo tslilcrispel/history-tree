@@ -30,6 +30,13 @@ export interface HistoryStep<T = unknown> {
   tag?: ReactNode;
   /** Accent colour for the chip and the active-card border/glow. */
   accent?: string;
+  /**
+   * When `true` the step is rendered faded and non-interactive: `onStepClick`
+   * and `onStepMore` (⋯ button, right-click, Enter/Space) never fire for it.
+   * It still takes part in layout and in the path to the current step, and
+   * `onStepHover` still fires so you can show a reason in a tooltip.
+   */
+  disabled?: boolean;
   /** Opaque payload passed straight back to your event handlers. Never read by the component. */
   data?: T;
 }
@@ -93,6 +100,8 @@ export interface LaidOutNode<T = unknown> {
   onPath: boolean;
   /** True when this step has at least one child. */
   hasChildren: boolean;
+  /** True when the step is disabled (faded, non-interactive). */
+  disabled: boolean;
 }
 
 /** A parent → child connector, as an SVG cubic-bezier path. */
@@ -139,6 +148,8 @@ export interface HistoryTreeTheme {
   moreColor: string;
   /** Text / icon colour when sitting on an accent fill (the current mini dot). */
   accentText: string;
+  /** Opacity applied to a `disabled` step, in both variants. Default `0.4`. */
+  disabledOpacity: number;
   /** Body font stack. */
   fontFamily: string;
   /** Monospace font stack (tag chip). */

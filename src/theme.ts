@@ -17,6 +17,7 @@ export const darkTheme: HistoryTreeTheme = {
   subtitleColor: "#738299",
   moreColor: "#8ea3bd",
   accentText: "#0a0f18",
+  disabledOpacity: 0.4,
   fontFamily: FONT,
   monoFamily: MONO,
 };
@@ -34,6 +35,7 @@ export const lightTheme: HistoryTreeTheme = {
   subtitleColor: "#6a7a92",
   moreColor: "#5c6e88",
   accentText: "#0e1926",
+  disabledOpacity: 0.45,
   fontFamily: FONT,
   monoFamily: MONO,
 };

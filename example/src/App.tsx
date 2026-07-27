@@ -20,8 +20,8 @@ import {
  * A small demo app that exercises every feature of `history-tree`:
  *  - feeding data (built from a GraphScope-style raw step map via `fromStepMap`)
  *  - onStepClick   → restore / set the current step
- *  - onStepMore    → open a real action menu (branch / set current / delete)
- *  - onStepHover   → live highlight in the side panel
+ *  - onStepMore    → open a real action menu (branch / set current / disable / delete)
+ *  - onStepHover   → live highlight in the side panel (fires for disabled steps too)
  *  - theme + layout overrides
  */
 
@@ -47,7 +47,8 @@ const SEED: Record<string, RawStep> = {
   s3: { id: "s3", parent: "s2", logicName: "Shortest Path", inputLabel: "Aria, Ben", tag: icon(faRoute), accent: "#5b9bff", addedCount: 3, groupCount: 0 },
   s4: { id: "s4", parent: "s2", logicName: "Shared-Attribute", inputLabel: "3 people", tag: "SA", accent: "#f7c948", addedCount: 4, groupCount: 1 },
   s5: { id: "s5", parent: "s4", logicName: "Community", inputLabel: "whole graph", tag: icon(faUsers), accent: "#b98bff", addedCount: 0, groupCount: 2 },
-  s6: { id: "s6", parent: "s3", logicName: "Circular-Flow", inputLabel: "12 accounts", tag: icon(faArrowsSpin), accent: "#ff6b6b", addedCount: 5, groupCount: 1 },
+  // s6 ships disabled: a step whose snapshot can no longer be restored.
+  s6: { id: "s6", parent: "s3", logicName: "Circular-Flow", inputLabel: "stale snapshot", tag: icon(faArrowsSpin), accent: "#ff6b6b", addedCount: 5, groupCount: 1, disabled: true },
 };
 
 type MenuState = { step: HistoryStep<RawStep>; x: number; y: number } | null;
@@ -90,6 +91,22 @@ export function App() {
     addLog(`branched → ${spec.logicName} (${id}) under ${parentId}`);
   };
 
+  // Disabled steps refuse every event, so re-enabling has to come from outside
+  // the tree — here the "Enable all" header button.
+  const disable = (id: string) => {
+    setStepMap((m) => ({ ...m, [id]: { ...m[id], disabled: true } }));
+    addLog(`disabled ${id}`);
+  };
+
+  const enableAll = () => {
+    setStepMap((m) => {
+      const next: Record<string, RawStep> = {};
+      for (const s of Object.values(m)) next[s.id] = { ...s, disabled: false };
+      return next;
+    });
+    addLog("enabled all steps");
+  };
+
   const deleteSubtree = (rootId: string) => {
     setStepMap((m) => {
       const kill = new Set<string>();
@@ -118,6 +135,7 @@ export function App() {
 
   // ---- render ---------------------------------------------------------------
   const c = dark ? colorsDark : colorsLight;
+  const disabledCount = Object.values(stepMap).filter((s) => s.disabled).length;
 
   return (
     <div style={{ ...page, background: c.pageBg, color: c.text }} onClick={() => setMenu(null)}>
@@ -158,6 +176,11 @@ export function App() {
           </select>
         )}
         <button style={btn(c)} onClick={reset}>Reset</button>
+        {disabledCount > 0 && (
+          <button style={btn(c)} onClick={enableAll}>
+            Enable all ({disabledCount})
+          </button>
+        )}
         <button style={btn(c)} onClick={() => branchFrom(currentId)}>
           + Branch from current
         </button>
@@ -203,6 +226,7 @@ export function App() {
               <li>Hover the <b style={{ color: c.text }}>current</b> card → the <b style={{ color: c.text }}>⋯</b> button appears.</li>
               <li><b style={{ color: c.text }}>Right-click</b> any node for the same menu (works in mini too).</li>
               <li><b style={{ color: c.text }}>⋯ → Branch</b> to grow a new child.</li>
+              <li><b style={{ color: c.text }}>⋯ → Disable</b> — the card fades, stops responding to clicks and right-clicks, but still reports hover. <b style={{ color: c.text }}>Enable all</b> brings it back.</li>
               <li>Toggle the theme; drop a wide history to scroll.</li>
             </ul>
           </Section>
@@ -221,6 +245,7 @@ export function App() {
           onClose={() => setMenu(null)}
           onBranch={branchFrom}
           onSetCurrent={setCurrentId}
+          onDisable={disable}
           onDelete={deleteSubtree}
         />
       )}
@@ -236,6 +261,7 @@ function MoreMenu({
   onClose,
   onBranch,
   onSetCurrent,
+  onDisable,
   onDelete,
 }: {
   menu: NonNullable<MenuState>;
@@ -243,6 +269,7 @@ function MoreMenu({
   onClose: () => void;
   onBranch: (id: string) => void;
   onSetCurrent: (id: string) => void;
+  onDisable: (id: string) => void;
   onDelete: (id: string) => void;
 }) {
   const id = menu.step.id;
@@ -274,6 +301,7 @@ function MoreMenu({
       </div>
       <div style={item} onClick={run(onBranch)}>Branch from here</div>
       <div style={item} onClick={run(onSetCurrent)}>Set as current</div>
+      <div style={item} onClick={run(onDisable)}>Disable step</div>
       <div style={{ ...item, color: "#ff8080" }} onClick={run(onDelete)}>Delete subtree</div>
     </div>
   );
@@ -286,6 +314,7 @@ function StepInfo({ step, dim }: { step?: RawStep; dim: string }) {
       <div><b>{step.logicName}</b> <code style={{ color: dim }}>({step.id})</code></div>
       <div style={{ color: dim }}>input: {step.inputLabel ?? "—"}</div>
       <div style={{ color: dim }}>parent: {step.parent ?? "root"} · +{step.addedCount ?? 0}n · +{step.groupCount ?? 0}g</div>
+      {step.disabled && <div style={{ color: dim }}>state: disabled</div>}
     </div>
   );
 }

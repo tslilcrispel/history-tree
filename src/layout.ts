@@ -149,6 +149,7 @@ export function computeLayout<T = unknown>(
       isCurrent: step.id === currentStepId,
       onPath: anc.has(step.id),
       hasChildren: !!(children && children.length),
+      disabled: step.disabled === true,
     };
   });
 

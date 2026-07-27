@@ -187,7 +187,7 @@ export function HistoryTree<T = unknown>(props: HistoryTreeProps<T>) {
       </svg>
 
       {layout.nodes.map((node) => {
-        const { step } = node;
+        const { step, disabled } = node;
         const accent = step.accent ?? DEFAULT_ACCENT;
         const border = node.isCurrent
           ? accent
@@ -200,18 +200,21 @@ export function HistoryTree<T = unknown>(props: HistoryTreeProps<T>) {
             ? theme.cardBgOnPath
             : theme.cardBg;
         const showMore =
-          !!onStepMore && (!moreOnHoverOnly || hoverId === step.id || node.isCurrent);
+          !disabled &&
+          !!onStepMore &&
+          (!moreOnHoverOnly || hoverId === step.id || node.isCurrent);
 
         return (
           <div
             key={step.id}
             role="treeitem"
             aria-selected={node.isCurrent}
-            tabIndex={0}
+            aria-disabled={disabled || undefined}
+            tabIndex={disabled ? -1 : 0}
             title={step.subtitle ? `${step.title} · ${step.subtitle}` : step.title}
-            onClick={(e) => onStepClick?.(step, e)}
+            onClick={disabled ? undefined : (e) => onStepClick?.(step, e)}
             onContextMenu={
-              onStepMore
+              onStepMore && !disabled
                 ? (e) => {
                     e.preventDefault();
                     onStepMore(step, e);
@@ -219,7 +222,7 @@ export function HistoryTree<T = unknown>(props: HistoryTreeProps<T>) {
                 : undefined
             }
             onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
+              if (!disabled && (e.key === "Enter" || e.key === " ")) {
                 e.preventDefault();
                 onStepClick?.(step, e as unknown as React.MouseEvent);
               }
@@ -240,14 +243,17 @@ export function HistoryTree<T = unknown>(props: HistoryTreeProps<T>) {
               height: node.height,
               padding: "6px 9px",
               borderRadius: 9,
-              cursor: onStepClick ? "pointer" : "default",
+              cursor: disabled ? "not-allowed" : onStepClick ? "pointer" : "default",
               boxSizing: "border-box",
               overflow: "hidden",
-              border: `1px solid ${border}`,
+              // Dashed + faded, so "disabled" reads without relying on opacity alone.
+              border: `1px ${disabled ? "dashed" : "solid"} ${border}`,
               background,
-              boxShadow: node.isCurrent
-                ? `0 0 0 1px ${accent}55, 0 0 14px ${accent}33`
-                : "none",
+              opacity: disabled ? theme.disabledOpacity : 1,
+              boxShadow:
+                node.isCurrent && !disabled
+                  ? `0 0 0 1px ${accent}55, 0 0 14px ${accent}33`
+                  : "none",
               transition: "all .12s",
             }}
           >
@@ -354,7 +360,13 @@ function MiniStrip<T>({
           const accent = step.accent ?? DEFAULT_ACCENT;
           const isCurrent = step.id === currentStepId;
           const inPath = onPath.has(step.id);
-          const dimmed = !inPath && hoverId !== step.id;
+          const disabled = step.disabled === true;
+          // A disabled dot keeps its fade even while hovered.
+          const opacity = disabled
+            ? theme.disabledOpacity
+            : !inPath && hoverId !== step.id
+              ? mini.inactiveOpacity
+              : 1;
           const size = isCurrent ? mini.currentDotSize : mini.dotSize;
           const tagIsText =
             typeof step.tag === "string" || typeof step.tag === "number";
@@ -376,10 +388,11 @@ function MiniStrip<T>({
                 type="button"
                 role="listitem"
                 aria-current={isCurrent}
+                aria-disabled={disabled || undefined}
                 title={tip}
-                onClick={(e) => onStepClick?.(step, e)}
+                onClick={disabled ? undefined : (e) => onStepClick?.(step, e)}
                 onContextMenu={
-                  onStepMore
+                  onStepMore && !disabled
                     ? (e) => {
                         e.preventDefault();
                         onStepMore(step, e);
@@ -407,14 +420,14 @@ function MiniStrip<T>({
                   fontWeight: 700,
                   fontFamily: tagIsText ? theme.monoFamily : theme.fontFamily,
                   lineHeight: 1,
-                  cursor: onStepClick ? "pointer" : "default",
+                  cursor: disabled ? "not-allowed" : onStepClick ? "pointer" : "default",
                   color: isCurrent ? theme.accentText : accent,
                   background: isCurrent ? accent : `${accent}22`,
-                  border: `1.5px solid ${
+                  border: `1.5px ${disabled ? "dashed" : "solid"} ${
                     isCurrent ? accent : inPath ? `${accent}99` : `${accent}44`
                   }`,
-                  boxShadow: isCurrent ? `0 0 10px ${accent}88` : "none",
-                  opacity: dimmed ? mini.inactiveOpacity : 1,
+                  boxShadow: isCurrent && !disabled ? `0 0 10px ${accent}88` : "none",
+                  opacity,
                   transition: "all .12s",
                 }}
               >

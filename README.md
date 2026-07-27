@@ -67,6 +67,7 @@ interface HistoryStep<T = unknown> {
   subtitle?: string;         // secondary line
   tag?: React.ReactNode;     // chip content: a string OR an icon element
   accent?: string;           // chip + active-border colour
+  disabled?: boolean;        // faded + non-interactive (see below)
   data?: T;                  // opaque payload echoed back on every event
 }
 ```
@@ -74,6 +75,28 @@ interface HistoryStep<T = unknown> {
 - Supports a **forest** (multiple roots).
 - `currentStepId` highlights the current card and the path back to its root.
 - Steps with an unknown `parentId` are treated as roots; cycles are guarded against.
+
+### Disabled steps
+
+Set `disabled: true` to render a step faded and **non-interactive** — e.g. a step
+whose snapshot can no longer be restored, or one that is still being computed.
+
+```tsx
+{ id: "s7", parentId: "s2", title: "Circular-Flow", subtitle: "stale snapshot", disabled: true }
+```
+
+- `onStepClick` and `onStepMore` never fire for it: the ⋯ button isn't rendered,
+  right-click falls through to the browser's own menu, and Enter/Space do
+  nothing. The card is skipped by tab navigation (`tabIndex={-1}`, plus
+  `aria-disabled`).
+- `onStepHover` **still** fires, so you can explain *why* it's disabled in your
+  own tooltip or side panel.
+- It keeps its place in the layout and still counts towards the path to the
+  current step — disabling a step never re-shapes the tree.
+- Works in both variants: the card / dot gets a dashed border at
+  `theme.disabledOpacity` (default `0.4`), and the current-step glow is dropped
+  while it's disabled.
+- `renderCard` receives `node.disabled`, so custom cards can style it too.
 
 ### Tag: string or icon
 
