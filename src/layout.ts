@@ -45,6 +45,50 @@ export function ancestorsOf<T>(
 }
 
 /**
+ * Resolve the full chain of steps from a root down to `stepId`.
+ *
+ * Walks up through `parentId` from the given step and returns the whole
+ * branch as step objects — the root first and `stepId` last, i.e. breadcrumb
+ * order. Call `.reverse()` if you want the step first and its ancestors after.
+ *
+ * Stops cleanly on a missing parent (that step is treated as a root) and on a
+ * cycle, so it always terminates. Returns `[]` when `stepId` is nullish or
+ * unknown.
+ *
+ * Pure and side-effect free: safe to call inside a `useMemo`.
+ *
+ * @param steps - All known steps, either as an array or an id → step map.
+ * @param stepId - Id of the step to resolve the chain for.
+ *
+ * @example
+ * ```ts
+ * const chain = chainToStep(steps, currentStepId);
+ * chain.map((s) => s.title).join(" › "); // "Load › Expand › Filter"
+ * const step = chain.at(-1);             // the step itself
+ * const parents = chain.slice(0, -1);    // just its ancestors
+ * ```
+ */
+export function chainToStep<T = unknown>(
+  steps: HistoryStep<T>[] | Map<string, HistoryStep<T>>,
+  stepId: string | null | undefined
+): HistoryStep<T>[] {
+  const byId =
+    steps instanceof Map ? steps : new Map(steps.map((s) => [s.id, s]));
+
+  const chain: HistoryStep<T>[] = [];
+  const seen = new Set<string>();
+  let cursor = stepId ?? null;
+  while (cursor && !seen.has(cursor)) {
+    const step = byId.get(cursor);
+    if (!step) break; // unknown parent → previous step was a root
+    seen.add(cursor);
+    chain.push(step);
+    cursor = step.parentId;
+  }
+  return chain.reverse();
+}
+
+/**
  * Position every step in a branching tree (or forest).
  *
  * Depth (distance from a root) drives the horizontal column; a leaf counter

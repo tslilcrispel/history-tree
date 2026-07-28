@@ -205,6 +205,26 @@ Custom card body while keeping automatic positioning:
 positioned `nodes` + SVG `links` + total `width`/`height`. Use it directly if you
 want to render the tree yourself (canvas, a different framework, tests).
 
+`chainToStep(steps, stepId)` returns the step **and all of its parents** — the
+whole branch from a root down to that step, in breadcrumb order (root first,
+`stepId` last). Handy for a breadcrumb bar, a "replay from the top" action, or
+just reading the path that led to a step.
+
+```tsx
+import { chainToStep } from "history-tree";
+
+const chain = chainToStep(steps, currentStepId);
+
+chain.map((s) => s.title).join(" › "); // "Load › Expand › Filter"
+const step = chain.at(-1);             // the step itself
+const parents = chain.slice(0, -1);    // only its ancestors
+[...chain].reverse();                  // step first, ancestors after
+```
+
+It accepts either the `HistoryStep[]` array or an `id → step` `Map` (pass the
+map if you call it in a loop), returns `[]` for an unknown id, and terminates
+safely on missing parents and cycles.
+
 ## Example
 
 A runnable Vite demo lives in [`example/`](./example) — it imports the library
