@@ -1,6 +1,6 @@
 {
   "name": "history-tree",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A branching step-history tree for investigation / graph tools. React + TypeScript, zero runtime dependencies.",
   "type": "module",
   "main": "./dist/index.cjs",
