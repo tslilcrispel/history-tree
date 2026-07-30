@@ -180,6 +180,8 @@ Direction applies to the tree variant; the `mini` strip is always a horizontal r
 
 ## Theming
 
+Two interchangeable ways to style it: props, or [CSS variables](#styling-with-css-variables).
+
 Pass a partial `theme` (merged over the built-in `darkTheme`), and/or `layout`
 geometry overrides.
 
@@ -198,6 +200,108 @@ Custom card body while keeping automatic positioning:
 ```tsx
 <HistoryTree steps={steps} renderCard={(node) => <MyCard step={node.step} />} />
 ```
+
+## Styling with CSS variables
+
+Every value the component paints — colours, fonts, radii, borders, shadows,
+spacing, font sizes, the transition — is written as `var(--ht-…, <fallback>)`,
+where the fallback is the resolved `theme` / `mini` prop. So you can drive the
+whole look from CSS and never pass a style prop:
+
+```css
+/* anywhere: :root, an ancestor, your design-token file, a media query… */
+.history-panel {
+  --ht-card-bg: #fffdf7;
+  --ht-card-radius: 3px;
+  --ht-title-color: #2b2519;
+  --ht-link-color-active: #8a7a4e;
+  --ht-font-family: Georgia, serif;
+}
+```
+
+```tsx
+<HistoryTree steps={steps} currentStepId={current} className="history-panel" />
+```
+
+…or set them inline from JS with the `cssVars` prop (values are raw CSS, so
+lengths need their unit):
+
+```tsx
+<HistoryTree steps={steps} cssVars={{ "--ht-card-radius": "3px", "--ht-title-color": "#fff" }} />
+```
+
+`HistoryTreeCssVars` types the whole set, so the names autocomplete.
+`HISTORY_TREE_CSS_VARS` is the same list at runtime, and `themeToCssVars(theme)`
+converts a theme object into the matching variables when you want to set them
+somewhere other than the component.
+
+**Precedence:** `cssVars` (inline) ▸ a CSS rule ▸ the `theme` / `mini` props ▸
+the built-in defaults. A stylesheet therefore wins over `theme` — pick one as
+your source of truth for a given value.
+
+### Class and state hooks
+
+Elements carry stable class names and `data-*` state attributes, so CSS can
+reach states props can't — `:hover`, `:focus-visible`, print, media queries:
+
+| Class | Element | State attributes |
+| --- | --- | --- |
+| `ht-root` + `ht-tree` / `ht-mini` | the root | `data-direction` (tree) |
+| `ht-canvas`, `ht-links`, `ht-link` | positioning box, SVG, one connector | `data-active` |
+| `ht-card` | a step card (tree) | `data-current`, `data-on-path`, `data-disabled` |
+| `ht-tag`, `ht-title`, `ht-subtitle`, `ht-more` | default card internals + ⋯ | — |
+| `ht-mini-strip`, `ht-mini-dot`, `ht-mini-connector` | mini strip | `data-current`, `data-on-path`, `data-disabled`, `data-active` |
+| `ht-mini-summary`, `-title`, `-subtitle` | trailing current-step summary | — |
+| `ht-empty` | the built-in empty state | — |
+
+Because the inline styles *read* variables rather than hard-code values, a rule
+that only **sets a variable** wins — no `!important` needed:
+
+```css
+.ht-card:hover      { --ht-card-bg: #1b2941; --ht-card-shadow: 0 4px 14px #0008; }
+.ht-card[data-disabled] { --ht-card-border-style-disabled: dotted; }
+```
+
+### Per-step accent
+
+The component publishes each step's `accent` as `--ht-accent` on that card / dot,
+so your rules can derive from it — every card keeps its own colour:
+
+```css
+.ht-card {
+  --ht-card-border-color: color-mix(in srgb, var(--ht-accent) 30%, transparent);
+  --ht-tag-bg:            color-mix(in srgb, var(--ht-accent) 18%, transparent);
+}
+```
+
+`--ht-accent` is always defined (steps without an `accent` fall back to
+`--ht-accent-default`, then to the built-in grey), so it never needs a fallback.
+
+### The variables
+
+`-active` means *the current step*, `-on-path` means *on the path to it*.
+
+| Group | Variables |
+| --- | --- |
+| Global | `--ht-font-family`, `--ht-mono-family`, `--ht-transition`, `--ht-disabled-opacity`, `--ht-accent` (read-only), `--ht-accent-default` |
+| Connectors | `--ht-link-color`, `--ht-link-color-active`, `--ht-link-width`, `--ht-link-width-active` |
+| Card | `--ht-card-bg`, `--ht-card-bg-on-path`, `--ht-card-bg-active`, `--ht-card-border-color`, `--ht-card-border-color-on-path`, `--ht-card-border-color-active`, `--ht-card-border-width`, `--ht-card-border-style`, `--ht-card-border-style-disabled`, `--ht-card-radius`, `--ht-card-padding`, `--ht-card-shadow`, `--ht-card-shadow-active` |
+| Card text | `--ht-title-color`, `--ht-title-font-size`, `--ht-title-font-weight`, `--ht-subtitle-color`, `--ht-subtitle-font-size`, `--ht-subtitle-gap` |
+| Tag chip | `--ht-tag-size`, `--ht-tag-radius`, `--ht-tag-gap`, `--ht-tag-font-size`, `--ht-tag-font-weight`, `--ht-tag-color`, `--ht-tag-bg`, `--ht-tag-border-color`, `--ht-tag-border-width` |
+| ⋯ button | `--ht-more-color`, `--ht-more-bg`, `--ht-more-size`, `--ht-more-font-size`, `--ht-more-radius`, `--ht-more-offset` |
+| Mini dots | `--ht-mini-padding`, `--ht-mini-inactive-opacity`, `--ht-mini-dot-size`, `--ht-mini-dot-size-active`, `--ht-mini-dot-radius`, `--ht-mini-dot-font-size`, `--ht-mini-dot-font-weight`, `--ht-mini-dot-color`, `--ht-mini-dot-color-active`, `--ht-mini-dot-bg`, `--ht-mini-dot-bg-active`, `--ht-mini-dot-border-width`, `--ht-mini-dot-border-color`, `--ht-mini-dot-border-color-on-path`, `--ht-mini-dot-border-color-active`, `--ht-mini-dot-shadow`, `--ht-mini-dot-shadow-active` |
+| Mini strip | `--ht-mini-connector-width`, `--ht-mini-connector-height`, `--ht-mini-connector-color`, `--ht-mini-connector-color-active`, `--ht-mini-summary-gap`, `--ht-mini-summary-padding`, `--ht-mini-summary-border-color`, `--ht-mini-summary-title-color`, `--ht-mini-summary-title-font-size`, `--ht-mini-summary-title-font-weight`, `--ht-mini-summary-subtitle-color`, `--ht-mini-summary-subtitle-font-size` |
+| Empty state | `--ht-empty-color`, `--ht-empty-padding`, `--ht-empty-font-size` |
+
+Some variables chain to a more general one when unset — e.g.
+`--ht-mini-summary-title-color` falls back to `--ht-title-color`, and
+`--ht-mini-connector-color-active` to `--ht-link-color-active` — so you can
+restyle broadly and only get specific where you need to.
+
+**What CSS can't move:** card *size* and node *positions* come from
+`computeLayout` in JS, so `cardWidth`, `cardHeight`, `columnWidth`, `rowHeight`,
+`padX`, `padY`, and `direction` stay on the `layout` prop. Keep
+`--ht-card-padding` and the font sizes within the card height you set there.
 
 ## Headless layout
 

@@ -5,9 +5,11 @@ import {
   darkTheme,
   lightTheme,
   type HistoryStep,
+  type HistoryTreeCssVars,
   type RawStep,
   type LayoutDirection,
 } from "history-tree";
+import "./skins.css";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faRoute,
@@ -23,7 +25,22 @@ import {
  *  - onStepMore    → open a real action menu (branch / set current / disable / delete)
  *  - onStepHover   → live highlight in the side panel (fires for disabled steps too)
  *  - theme + layout overrides
+ *  - CSS-variable styling, both ways: a stylesheet skin (`skins.css`) and the
+ *    `cssVars` prop
  */
+
+// The skins live in `skins.css` as plain `.skin-* { --ht-*: … }` blocks — the
+// component never learns about them; it just reads the variables.
+const SKINS = ["off", "soft", "neon", "paper"] as const;
+type Skin = (typeof SKINS)[number];
+
+// The same mechanism from JS: values passed inline on the root element.
+const BIG_TEXT: HistoryTreeCssVars = {
+  "--ht-title-font-size": "13px",
+  "--ht-subtitle-font-size": "11px",
+  "--ht-tag-size": "24px",
+  "--ht-mini-summary-title-font-size": "13px",
+};
 
 // A `tag` can be any React node. This example mixes both kinds so you can see
 // them together: some steps use a Font Awesome icon, others a short text label.
@@ -59,6 +76,8 @@ export function App() {
   const [dark, setDark] = React.useState(true);
   const [view, setView] = React.useState<"tree" | "mini">("tree");
   const [dir, setDir] = React.useState<LayoutDirection>("LR");
+  const [skin, setSkin] = React.useState<Skin>("off");
+  const [bigText, setBigText] = React.useState(false);
   const [hoverId, setHoverId] = React.useState<string | null>(null);
   const [menu, setMenu] = React.useState<MenuState>(null);
   const [log, setLog] = React.useState<string[]>([]);
@@ -175,6 +194,24 @@ export function App() {
             <option value="BT">Bottom → Top</option>
           </select>
         )}
+        <select
+          value={skin}
+          onChange={(e) => setSkin(e.target.value as Skin)}
+          title="CSS-variable skin (skins.css)"
+          style={{ ...btn(c), appearance: "auto" }}
+        >
+          <option value="off">Skin: none</option>
+          <option value="soft">Skin: soft</option>
+          <option value="neon">Skin: neon</option>
+          <option value="paper">Skin: paper</option>
+        </select>
+        <button
+          style={{ ...btn(c), background: bigText ? c.border : "transparent" }}
+          onClick={() => setBigText((b) => !b)}
+          title="Sets --ht-* values inline via the cssVars prop"
+        >
+          A⁺ cssVars
+        </button>
         <button style={btn(c)} onClick={reset}>Reset</button>
         {disabledCount > 0 && (
           <button style={btn(c)} onClick={enableAll}>
@@ -198,6 +235,10 @@ export function App() {
             variant={view}
             layout={{ direction: dir }}
             theme={dark ? darkTheme : lightTheme}
+            // A stylesheet skin: `.skin-neon { --ht-card-bg: … }` in skins.css.
+            className={skin === "off" ? undefined : `skin-${skin}`}
+            // The same variables, set inline from JS.
+            cssVars={bigText ? BIG_TEXT : undefined}
             style={view === "tree" ? { minWidth: "100%", minHeight: "100%" } : undefined}
             onStepClick={(s) => {
               setCurrentId(s.id);
@@ -227,6 +268,8 @@ export function App() {
               <li><b style={{ color: c.text }}>Right-click</b> any node for the same menu (works in mini too).</li>
               <li><b style={{ color: c.text }}>⋯ → Branch</b> to grow a new child.</li>
               <li><b style={{ color: c.text }}>⋯ → Disable</b> — the card fades, stops responding to clicks and right-clicks, but still reports hover. <b style={{ color: c.text }}>Enable all</b> brings it back.</li>
+              <li>Pick a <b style={{ color: c.text }}>Skin</b> — pure CSS (<code>skins.css</code>), no props. <i>soft</i> adds a real <b style={{ color: c.text }}>:hover</b> state, <i>neon</i> derives every glow from <code>--ht-accent</code>. Skins beat the theme prop, so the dark/light toggle stops mattering.</li>
+              <li><b style={{ color: c.text }}>A⁺ cssVars</b> sets the same variables inline from JS.</li>
               <li>Toggle the theme; drop a wide history to scroll.</li>
             </ul>
           </Section>

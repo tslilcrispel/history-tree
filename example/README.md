@@ -20,6 +20,10 @@ npm run dev        # open the printed http://localhost:5173
   (branch / set current / delete subtree).
 - **`onStepHover`** — hovered step is inspected live in the side panel.
 - **Theming** — toggle the built-in `darkTheme` / `lightTheme`.
+- **CSS-variable styling** — the **Skin** dropdown swaps between three looks
+  defined purely in [`src/skins.css`](./src/skins.css) (`soft`, `neon`, `paper`),
+  including a CSS-only `:hover` state and glows derived from `--ht-accent`;
+  **A⁺ cssVars** sets the same variables inline from JS via the `cssVars` prop.
 - **Variants** — switch between the full `tree` and the compact `mini` strip.
 - **Icon tags** — Font Awesome icons used as step `tag`s (the seed keeps a string tag).
 - **Live branching** — grow the tree at runtime to watch layout reflow.

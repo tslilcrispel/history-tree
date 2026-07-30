@@ -8,6 +8,7 @@ import type {
 } from "./types";
 import { ancestorsOf, computeLayout, DEFAULT_LAYOUT, DEFAULT_MINI } from "./layout";
 import { DEFAULT_ACCENT, resolveTheme } from "./theme";
+import { cssVar, type HistoryTreeCssVars } from "./cssVars";
 
 /** Signature shared by the step event handlers. */
 export type StepHandler<T> = (
@@ -27,6 +28,16 @@ export interface HistoryTreeProps<T = unknown> {
   variant?: "tree" | "mini";
   /** Colour / font overrides, merged over the dark default. */
   theme?: Partial<HistoryTreeTheme>;
+  /**
+   * CSS custom properties set inline on the root, e.g.
+   * `{ "--ht-card-radius": "4px", "--ht-title-color": "#fff" }`.
+   *
+   * Every painted value is written as `var(--ht-…, <theme fallback>)`, so the
+   * same variables can equally be set from a stylesheet — on an ancestor, on
+   * `:root`, in a media query, or in a `.ht-card:hover` rule. Values are raw
+   * CSS: lengths need their unit. See {@link HistoryTreeCssVars}.
+   */
+  cssVars?: HistoryTreeCssVars;
   /** Geometry overrides for the tree (column width, card size, padding…). */
   layout?: Partial<LayoutOptions>;
   /** Geometry overrides for the `"mini"` strip (dot sizes, connector width…). */
@@ -66,11 +77,24 @@ export interface HistoryTreeProps<T = unknown> {
   ariaLabel?: string;
 }
 
+/** Join class names, skipping the empty ones. */
+const cx = (...parts: (string | false | undefined)[]) =>
+  parts.filter(Boolean).join(" ");
+
+/** Custom properties aren't in `CSSProperties`; React passes them through fine. */
+const varStyle = (vars?: HistoryTreeCssVars): React.CSSProperties | undefined =>
+  vars as React.CSSProperties | undefined;
+
 /**
  * A branching step-history tree, or (with `variant="mini"`) a compact strip.
  *
  * Presentational and self-sizing: it renders at the natural size of its content
  * (`position: relative`). Wrap it in an `overflow: auto` container to scroll.
+ *
+ * Every colour, font, radius, and spacing it paints reads from a `--ht-*` CSS
+ * custom property that falls back to the `theme` / `mini` props, and every
+ * element carries a stable `ht-*` class plus `data-*` state attributes — so the
+ * whole look can be driven from CSS instead of props if you prefer.
  */
 export function HistoryTree<T = unknown>(props: HistoryTreeProps<T>) {
   const {
@@ -78,6 +102,7 @@ export function HistoryTree<T = unknown>(props: HistoryTreeProps<T>) {
     currentStepId,
     variant = "tree",
     theme: themeProp,
+    cssVars,
     layout: layoutProp,
     mini: miniProp,
     showCurrentSummary = true,
@@ -102,9 +127,25 @@ export function HistoryTree<T = unknown>(props: HistoryTreeProps<T>) {
 
   if (!steps.length) {
     return (
-      <div className={className} style={{ ...rootBase, ...style }} aria-label={ariaLabel}>
+      <div
+        className={cx("ht-root", "ht-empty-root", className)}
+        style={{ ...rootBase, ...style, ...varStyle(cssVars) }}
+        aria-label={ariaLabel}
+      >
         {emptyState ?? (
-          <div style={{ ...emptyBase, color: theme.subtitleColor, fontFamily: theme.fontFamily }}>
+          <div
+            className="ht-empty"
+            style={{
+              padding: cssVar("--ht-empty-padding", "24px 16px"),
+              fontSize: cssVar("--ht-empty-font-size", "12px"),
+              textAlign: "center",
+              color: cssVar(
+                "--ht-empty-color",
+                cssVar("--ht-subtitle-color", theme.subtitleColor)
+              ),
+              fontFamily: cssVar("--ht-font-family", theme.fontFamily),
+            }}
+          >
             — no steps yet —
           </div>
         )}
@@ -118,6 +159,7 @@ export function HistoryTree<T = unknown>(props: HistoryTreeProps<T>) {
         steps={steps}
         currentStepId={currentStepId}
         theme={theme}
+        cssVars={cssVars}
         mini={{ ...DEFAULT_MINI, ...miniProp }}
         showCurrentSummary={showCurrentSummary}
         onStepClick={onStepClick}
@@ -148,9 +190,10 @@ export function HistoryTree<T = unknown>(props: HistoryTreeProps<T>) {
 
   return (
     <div
-      className={className}
+      className={cx("ht-root", "ht-tree", className)}
       role="tree"
       aria-label={ariaLabel}
+      data-direction={direction}
       style={{
         ...rootBase,
         display: "flex",
@@ -158,11 +201,13 @@ export function HistoryTree<T = unknown>(props: HistoryTreeProps<T>) {
         alignItems,
         width: layout.width,
         height: layout.height,
-        fontFamily: theme.fontFamily,
+        fontFamily: cssVar("--ht-font-family", theme.fontFamily),
         ...style,
+        ...varStyle(cssVars),
       }}
     >
       <div
+        className="ht-canvas"
         style={{
           position: "relative",
           flex: "0 0 auto",
@@ -171,6 +216,7 @@ export function HistoryTree<T = unknown>(props: HistoryTreeProps<T>) {
         }}
       >
       <svg
+        className="ht-links"
         width={layout.width}
         height={layout.height}
         style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "visible" }}
@@ -178,10 +224,18 @@ export function HistoryTree<T = unknown>(props: HistoryTreeProps<T>) {
         {layout.links.map((ln) => (
           <path
             key={ln.id}
+            className="ht-link"
+            data-active={ln.active || undefined}
             d={ln.d}
             fill="none"
-            stroke={ln.active ? theme.linkColorActive : theme.linkColor}
-            strokeWidth={ln.active ? 2 : 1.4}
+            style={{
+              stroke: ln.active
+                ? cssVar("--ht-link-color-active", theme.linkColorActive)
+                : cssVar("--ht-link-color", theme.linkColor),
+              strokeWidth: ln.active
+                ? cssVar("--ht-link-width-active", 2)
+                : cssVar("--ht-link-width", 1.4),
+            }}
           />
         ))}
       </svg>
@@ -189,16 +243,17 @@ export function HistoryTree<T = unknown>(props: HistoryTreeProps<T>) {
       {layout.nodes.map((node) => {
         const { step, disabled } = node;
         const accent = step.accent ?? DEFAULT_ACCENT;
+        const accentVar = cssVar("--ht-accent", accent);
         const border = node.isCurrent
-          ? accent
+          ? cssVar("--ht-card-border-color-active", accentVar)
           : node.onPath
-            ? theme.cardBorderOnPath
-            : theme.cardBorder;
+            ? cssVar("--ht-card-border-color-on-path", theme.cardBorderOnPath)
+            : cssVar("--ht-card-border-color", theme.cardBorder);
         const background = node.isCurrent
-          ? theme.cardBgActive
+          ? cssVar("--ht-card-bg-active", theme.cardBgActive)
           : node.onPath
-            ? theme.cardBgOnPath
-            : theme.cardBg;
+            ? cssVar("--ht-card-bg-on-path", theme.cardBgOnPath)
+            : cssVar("--ht-card-bg", theme.cardBg);
         const showMore =
           !disabled &&
           !!onStepMore &&
@@ -207,9 +262,13 @@ export function HistoryTree<T = unknown>(props: HistoryTreeProps<T>) {
         return (
           <div
             key={step.id}
+            className="ht-card"
             role="treeitem"
             aria-selected={node.isCurrent}
             aria-disabled={disabled || undefined}
+            data-current={node.isCurrent || undefined}
+            data-on-path={node.onPath || undefined}
+            data-disabled={disabled || undefined}
             tabIndex={disabled ? -1 : 0}
             title={step.subtitle ? `${step.title} · ${step.subtitle}` : step.title}
             onClick={disabled ? undefined : (e) => onStepClick?.(step, e)}
@@ -241,21 +300,35 @@ export function HistoryTree<T = unknown>(props: HistoryTreeProps<T>) {
               top: node.y,
               width: node.width,
               height: node.height,
-              padding: "6px 9px",
-              borderRadius: 9,
+              padding: cssVar("--ht-card-padding", "6px 9px"),
+              borderRadius: cssVar("--ht-card-radius", "9px"),
               cursor: disabled ? "not-allowed" : onStepClick ? "pointer" : "default",
               boxSizing: "border-box",
               overflow: "hidden",
               // Dashed + faded, so "disabled" reads without relying on opacity alone.
-              border: `1px ${disabled ? "dashed" : "solid"} ${border}`,
+              borderWidth: cssVar("--ht-card-border-width", "1px"),
+              borderStyle: disabled
+                ? cssVar("--ht-card-border-style-disabled", "dashed")
+                : cssVar("--ht-card-border-style", "solid"),
+              borderColor: border,
               background,
-              opacity: disabled ? theme.disabledOpacity : 1,
+              opacity: disabled
+                ? cssVar("--ht-disabled-opacity", theme.disabledOpacity)
+                : 1,
               boxShadow:
                 node.isCurrent && !disabled
-                  ? `0 0 0 1px ${accent}55, 0 0 14px ${accent}33`
-                  : "none",
-              transition: "all .12s",
-            }}
+                  ? cssVar(
+                      "--ht-card-shadow-active",
+                      `0 0 0 1px ${accent}55, 0 0 14px ${accent}33`
+                    )
+                  : cssVar("--ht-card-shadow", "none"),
+              transition: cssVar("--ht-transition", "all .12s"),
+              // Always published, so `var(--ht-accent)` in your own rules
+              // always resolves; steps with no accent of their own pick up
+              // `--ht-accent-default` if you set one.
+              "--ht-accent":
+                step.accent ?? cssVar("--ht-accent-default", DEFAULT_ACCENT),
+            } as React.CSSProperties}
           >
             {renderCard ? (
               renderCard(node)
@@ -266,6 +339,7 @@ export function HistoryTree<T = unknown>(props: HistoryTreeProps<T>) {
             {showMore && (
               <button
                 type="button"
+                className="ht-more"
                 aria-label="More actions"
                 onClick={(e) => {
                   e.stopPropagation();
@@ -273,20 +347,20 @@ export function HistoryTree<T = unknown>(props: HistoryTreeProps<T>) {
                 }}
                 style={{
                   position: "absolute",
-                  top: 4,
-                  right: 4,
-                  width: 18,
-                  height: 18,
+                  top: cssVar("--ht-more-offset", "4px"),
+                  right: cssVar("--ht-more-offset", "4px"),
+                  width: cssVar("--ht-more-size", "18px"),
+                  height: cssVar("--ht-more-size", "18px"),
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   padding: 0,
-                  borderRadius: 5,
+                  borderRadius: cssVar("--ht-more-radius", "5px"),
                   border: "none",
                   cursor: "pointer",
-                  background: "transparent",
-                  color: theme.moreColor,
-                  fontSize: 13,
+                  background: cssVar("--ht-more-bg", "transparent"),
+                  color: cssVar("--ht-more-color", theme.moreColor),
+                  fontSize: cssVar("--ht-more-font-size", "13px"),
                   lineHeight: 1,
                 }}
               >
@@ -306,6 +380,7 @@ function MiniStrip<T>({
   steps,
   currentStepId,
   theme,
+  cssVars,
   mini,
   showCurrentSummary,
   onStepClick,
@@ -318,6 +393,7 @@ function MiniStrip<T>({
   steps: HistoryStep<T>[];
   currentStepId?: string | null;
   theme: HistoryTreeTheme;
+  cssVars?: HistoryTreeCssVars;
   mini: MiniLayoutOptions;
   showCurrentSummary: boolean;
   onStepClick?: StepHandler<T>;
@@ -341,33 +417,39 @@ function MiniStrip<T>({
 
   return (
     <div
-      className={className}
+      className={cx("ht-root", "ht-mini", className)}
       role="list"
       aria-label={ariaLabel}
       style={{
         display: "inline-flex",
         alignItems: "center",
-        gap: mini.summaryGap,
+        gap: cssVar("--ht-mini-summary-gap", `${mini.summaryGap}px`),
         maxWidth: "100%",
-        fontFamily: theme.fontFamily,
-        padding: "4px 0",
+        fontFamily: cssVar("--ht-font-family", theme.fontFamily),
+        padding: cssVar("--ht-mini-padding", "4px 0"),
         boxSizing: "border-box",
         ...style,
+        ...varStyle(cssVars),
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", overflowX: "auto" }}>
+      <div className="ht-mini-strip" style={{ display: "flex", alignItems: "center", overflowX: "auto" }}>
         {steps.map((step, idx) => {
           const accent = step.accent ?? DEFAULT_ACCENT;
+          const accentVar = cssVar("--ht-accent", accent);
           const isCurrent = step.id === currentStepId;
           const inPath = onPath.has(step.id);
           const disabled = step.disabled === true;
           // A disabled dot keeps its fade even while hovered.
           const opacity = disabled
-            ? theme.disabledOpacity
+            ? cssVar("--ht-disabled-opacity", theme.disabledOpacity)
             : !inPath && hoverId !== step.id
-              ? mini.inactiveOpacity
+              ? cssVar("--ht-mini-inactive-opacity", mini.inactiveOpacity)
               : 1;
           const size = isCurrent ? mini.currentDotSize : mini.dotSize;
+          const sizeVar = cssVar(
+            isCurrent ? "--ht-mini-dot-size-active" : "--ht-mini-dot-size",
+            `${size}px`
+          );
           const tagIsText =
             typeof step.tag === "string" || typeof step.tag === "number";
           const tip = step.title + (step.subtitle ? " · " + step.subtitle : "");
@@ -376,19 +458,33 @@ function MiniStrip<T>({
               {idx > 0 && (
                 <span
                   aria-hidden
+                  className="ht-mini-connector"
+                  data-active={inPath || undefined}
                   style={{
-                    width: mini.connectorWidth,
-                    height: 2,
+                    width: cssVar("--ht-mini-connector-width", `${mini.connectorWidth}px`),
+                    height: cssVar("--ht-mini-connector-height", "2px"),
                     flex: "0 0 auto",
-                    background: inPath ? theme.linkColorActive : theme.linkColor,
+                    background: inPath
+                      ? cssVar(
+                          "--ht-mini-connector-color-active",
+                          cssVar("--ht-link-color-active", theme.linkColorActive)
+                        )
+                      : cssVar(
+                          "--ht-mini-connector-color",
+                          cssVar("--ht-link-color", theme.linkColor)
+                        ),
                   }}
                 />
               )}
               <button
                 type="button"
+                className="ht-mini-dot"
                 role="listitem"
                 aria-current={isCurrent}
                 aria-disabled={disabled || undefined}
+                data-current={isCurrent || undefined}
+                data-on-path={inPath || undefined}
+                data-disabled={disabled || undefined}
                 title={tip}
                 onClick={disabled ? undefined : (e) => onStepClick?.(step, e)}
                 onContextMenu={
@@ -409,27 +505,49 @@ function MiniStrip<T>({
                 }}
                 style={{
                   flex: "0 0 auto",
-                  width: size,
-                  height: size,
+                  width: sizeVar,
+                  height: sizeVar,
                   padding: 0,
-                  borderRadius: "50%",
+                  borderRadius: cssVar("--ht-mini-dot-radius", "50%"),
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontSize: tagIsText ? 9 : Math.round(size * 0.5),
-                  fontWeight: 700,
-                  fontFamily: tagIsText ? theme.monoFamily : theme.fontFamily,
+                  // Icon dots scale with the dot itself, so overriding
+                  // `--ht-mini-dot-size` alone keeps the glyph proportional.
+                  fontSize: cssVar(
+                    "--ht-mini-dot-font-size",
+                    tagIsText ? "9px" : `calc(${sizeVar} * 0.5)`
+                  ),
+                  fontWeight: cssVar("--ht-mini-dot-font-weight", 700),
+                  fontFamily: tagIsText
+                    ? cssVar("--ht-mono-family", theme.monoFamily)
+                    : cssVar("--ht-font-family", theme.fontFamily),
                   lineHeight: 1,
                   cursor: disabled ? "not-allowed" : onStepClick ? "pointer" : "default",
-                  color: isCurrent ? theme.accentText : accent,
-                  background: isCurrent ? accent : `${accent}22`,
-                  border: `1.5px ${disabled ? "dashed" : "solid"} ${
-                    isCurrent ? accent : inPath ? `${accent}99` : `${accent}44`
-                  }`,
-                  boxShadow: isCurrent && !disabled ? `0 0 10px ${accent}88` : "none",
+                  color: isCurrent
+                    ? cssVar("--ht-mini-dot-color-active", theme.accentText)
+                    : cssVar("--ht-mini-dot-color", accentVar),
+                  background: isCurrent
+                    ? cssVar("--ht-mini-dot-bg-active", accentVar)
+                    : cssVar("--ht-mini-dot-bg", `${accent}22`),
+                  borderWidth: cssVar("--ht-mini-dot-border-width", "1.5px"),
+                  borderStyle: disabled
+                    ? cssVar("--ht-card-border-style-disabled", "dashed")
+                    : cssVar("--ht-card-border-style", "solid"),
+                  borderColor: isCurrent
+                    ? cssVar("--ht-mini-dot-border-color-active", accentVar)
+                    : inPath
+                      ? cssVar("--ht-mini-dot-border-color-on-path", `${accent}99`)
+                      : cssVar("--ht-mini-dot-border-color", `${accent}44`),
+                  boxShadow:
+                    isCurrent && !disabled
+                      ? cssVar("--ht-mini-dot-shadow-active", `0 0 10px ${accent}88`)
+                      : cssVar("--ht-mini-dot-shadow", "none"),
                   opacity,
-                  transition: "all .12s",
-                }}
+                  transition: cssVar("--ht-transition", "all .12s"),
+                  "--ht-accent":
+                    step.accent ?? cssVar("--ht-accent-default", DEFAULT_ACCENT),
+                } as React.CSSProperties}
               >
                 {step.tag}
               </button>
@@ -440,18 +558,26 @@ function MiniStrip<T>({
 
       {showCurrentSummary && current && (
         <div
+          className="ht-mini-summary"
           style={{
             flex: "0 1 auto",
             minWidth: 0,
-            borderLeft: `1px solid ${theme.cardBorder}`,
-            paddingLeft: 10,
+            borderLeft: `1px solid ${cssVar(
+              "--ht-mini-summary-border-color",
+              cssVar("--ht-card-border-color", theme.cardBorder)
+            )}`,
+            paddingLeft: cssVar("--ht-mini-summary-padding", "10px"),
           }}
         >
           <div
+            className="ht-mini-summary-title"
             style={{
-              fontSize: 11,
-              fontWeight: 650,
-              color: theme.titleColor,
+              fontSize: cssVar("--ht-mini-summary-title-font-size", "11px"),
+              fontWeight: cssVar("--ht-mini-summary-title-font-weight", 650),
+              color: cssVar(
+                "--ht-mini-summary-title-color",
+                cssVar("--ht-title-color", theme.titleColor)
+              ),
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
@@ -461,9 +587,13 @@ function MiniStrip<T>({
           </div>
           {current.subtitle != null && (
             <div
+              className="ht-mini-summary-subtitle"
               style={{
-                fontSize: 9,
-                color: theme.subtitleColor,
+                fontSize: cssVar("--ht-mini-summary-subtitle-font-size", "9px"),
+                color: cssVar(
+                  "--ht-mini-summary-subtitle-color",
+                  cssVar("--ht-subtitle-color", theme.subtitleColor)
+                ),
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
@@ -493,39 +623,53 @@ function DefaultCard<T>({
   const tagIsText = typeof step.tag === "string" || typeof step.tag === "number";
   return (
     <>
-      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <div
+        className="ht-card-head"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: cssVar("--ht-tag-gap", "6px"),
+        }}
+      >
         {step.tag != null && step.tag !== "" && (
           <span
+            className="ht-tag"
             style={{
               flex: "0 0 auto",
-              width: 20,
-              height: 20,
-              borderRadius: 6,
+              width: cssVar("--ht-tag-size", "20px"),
+              height: cssVar("--ht-tag-size", "20px"),
+              borderRadius: cssVar("--ht-tag-radius", "6px"),
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontSize: tagIsText ? 9 : 11.5,
-              fontWeight: 700,
-              fontFamily: tagIsText ? theme.monoFamily : theme.fontFamily,
+              fontSize: cssVar("--ht-tag-font-size", tagIsText ? "9px" : "11.5px"),
+              fontWeight: cssVar("--ht-tag-font-weight", 700),
+              fontFamily: tagIsText
+                ? cssVar("--ht-mono-family", theme.monoFamily)
+                : cssVar("--ht-font-family", theme.fontFamily),
               lineHeight: 1,
-              color: accent,
-              background: `${accent}22`,
-              border: `1px solid ${accent}55`,
+              color: cssVar("--ht-tag-color", cssVar("--ht-accent", accent)),
+              background: cssVar("--ht-tag-bg", `${accent}22`),
+              border: `${cssVar("--ht-tag-border-width", "1px")} solid ${cssVar(
+                "--ht-tag-border-color",
+                `${accent}55`
+              )}`,
             }}
           >
             {step.tag}
           </span>
         )}
         <span
+          className="ht-title"
           style={{
             flex: 1,
             minWidth: 0,
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
-            fontSize: 11.5,
-            fontWeight: 600,
-            color: theme.titleColor,
+            fontSize: cssVar("--ht-title-font-size", "11.5px"),
+            fontWeight: cssVar("--ht-title-font-weight", 600),
+            color: cssVar("--ht-title-color", theme.titleColor),
           }}
         >
           {step.title}
@@ -534,10 +678,11 @@ function DefaultCard<T>({
 
       {step.subtitle != null && (
         <div
+          className="ht-subtitle"
           style={{
-            fontSize: 9.5,
-            color: theme.subtitleColor,
-            marginTop: 3,
+            fontSize: cssVar("--ht-subtitle-font-size", "9.5px"),
+            color: cssVar("--ht-subtitle-color", theme.subtitleColor),
+            marginTop: cssVar("--ht-subtitle-gap", "3px"),
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
@@ -553,10 +698,4 @@ function DefaultCard<T>({
 const rootBase: React.CSSProperties = {
   position: "relative",
   boxSizing: "border-box",
-};
-
-const emptyBase: React.CSSProperties = {
-  padding: "24px 16px",
-  fontSize: 12,
-  textAlign: "center",
 };

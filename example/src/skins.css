@@ -1,0 +1,93 @@
+/*
+ * Three skins for <HistoryTree>, written entirely in CSS.
+ *
+ * Nothing here imports from the library or touches a prop: every value the
+ * component paints reads from a `--ht-*` custom property, and every element
+ * carries a stable `ht-*` class, so a plain stylesheet can restyle the whole
+ * thing — including states props can't reach, like `:hover`.
+ *
+ * CSS variables win over the `theme` prop, so a skin also overrides the
+ * app's dark/light toggle.
+ */
+
+/* ── soft ─────────────────────────────────────────────────────────────────
+   Rounder cards, more air, and a hover state driven from CSS. */
+.skin-soft {
+  /* Keep the box within the card height set by `layout.cardHeight` — CSS can
+     restyle the card, but its size still comes from the layout props. */
+  --ht-card-radius: 14px;
+  --ht-card-padding: 6px 12px;
+  --ht-card-bg: #111a26;
+  --ht-card-bg-on-path: #16233a;
+  --ht-card-bg-active: #1c2c47;
+  --ht-card-border-color: #22304a;
+  --ht-card-border-color-on-path: #3a5478;
+  --ht-card-border-width: 1.5px;
+  --ht-card-shadow: 0 2px 6px rgb(0 0 0 / 0.35);
+  --ht-card-shadow-active: 0 0 0 2px var(--ht-accent), 0 6px 22px rgb(0 0 0 / 0.5);
+  --ht-tag-radius: 999px;
+  --ht-tag-size: 20px;
+  --ht-title-font-size: 11.5px;
+  --ht-transition: all .2s ease;
+  --ht-link-width: 2;
+  --ht-link-width-active: 3;
+  --ht-mini-dot-shadow-active: 0 0 16px var(--ht-accent);
+}
+
+/* States the props don't expose — pure CSS, no re-render. */
+.skin-soft .ht-card:hover {
+  --ht-card-bg: #1b2941;
+  --ht-card-shadow: 0 4px 14px rgb(0 0 0 / 0.5);
+}
+
+/* ── neon ─────────────────────────────────────────────────────────────────
+   Everything derived from the per-step accent the component publishes as
+   `--ht-accent`, so each card glows in its own colour. */
+.skin-neon {
+  --ht-card-radius: 2px;
+  --ht-card-bg: #05070d;
+  --ht-card-bg-on-path: #070d18;
+  --ht-card-bg-active: #0a1322;
+  --ht-card-border-color: color-mix(in srgb, var(--ht-accent) 30%, transparent);
+  --ht-card-border-color-on-path: color-mix(in srgb, var(--ht-accent) 60%, transparent);
+  --ht-card-shadow: 0 0 8px color-mix(in srgb, var(--ht-accent) 15%, transparent);
+  --ht-card-shadow-active: 0 0 0 1px var(--ht-accent), 0 0 22px color-mix(in srgb, var(--ht-accent) 55%, transparent);
+  --ht-title-color: #d7f7ff;
+  --ht-subtitle-color: #5d7f92;
+  --ht-title-font-size: 11px;
+  --ht-title-font-weight: 700;
+  --ht-tag-radius: 2px;
+  --ht-tag-bg: color-mix(in srgb, var(--ht-accent) 18%, transparent);
+  --ht-link-color: #14324a;
+  --ht-link-color-active: #29d5ff;
+  --ht-link-width-active: 2.5;
+  --ht-mini-dot-radius: 3px;
+  --ht-mini-connector-height: 1px;
+}
+
+/* ── paper ────────────────────────────────────────────────────────────────
+   A light, printed look — including the font stacks. */
+.skin-paper {
+  --ht-font-family: Iowan Old Style, Palatino, Georgia, serif;
+  --ht-mono-family: ui-monospace, Menlo, monospace;
+  --ht-card-bg: #fffdf7;
+  --ht-card-bg-on-path: #fdf6e3;
+  --ht-card-bg-active: #fbecc8;
+  --ht-card-border-color: #ddd4c0;
+  --ht-card-border-color-on-path: #c4b795;
+  --ht-card-border-color-active: #8a7a4e;
+  --ht-card-radius: 3px;
+  --ht-card-shadow-active: 2px 2px 0 #d8ceb4;
+  --ht-title-color: #2b2519;
+  --ht-title-font-weight: 700;
+  --ht-subtitle-color: #857a63;
+  --ht-tag-radius: 3px;
+  --ht-tag-bg: #f0e7d2;
+  --ht-tag-border-color: #d8ceb4;
+  --ht-link-color: #ddd4c0;
+  --ht-link-color-active: #8a7a4e;
+  --ht-more-color: #6d6350;
+  --ht-mini-summary-title-color: #2b2519;
+  --ht-mini-summary-subtitle-color: #857a63;
+  --ht-mini-summary-border-color: #ddd4c0;
+}
